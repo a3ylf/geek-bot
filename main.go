@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"math/rand"
@@ -13,47 +12,8 @@ import (
 
 	"github.com/a3ylf/geek-bot/video"
 	"github.com/bwmarrin/discordgo"
-	"github.com/chromedp/chromedp"
 	"github.com/joho/godotenv"
 )
-
-func blackingtime() (string, string) {
-	// Configure o contexto com timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	// Configure o Chrome (use o caminho correto se necessário)
-	ctx, cancel = chromedp.NewExecAllocator(ctx, chromedp.DefaultExecAllocatorOptions[:]...)
-	defer cancel()
-	ctx, cancel = chromedp.NewContext(ctx)
-	defer cancel()
-
-	// URL do canal do YouTube (substitua pelo canal desejado)
-	url := "https://www.youtube.com/@blxckoficial/videos"
-
-	// Variáveis para armazenar os resultados
-	var videoTitles []string
-	var videoLinks []string
-
-	// Execute o scraping
-	err := chromedp.Run(ctx,
-		chromedp.Navigate(url),            // Acessa a página do canal
-		chromedp.WaitVisible(`#contents`), // Aguarda o carregamento dos vídeos
-
-		// Extrai os títulos dos vídeos
-		chromedp.Evaluate(`Array.from(document.querySelectorAll("#video-title")).map(e => e.textContent.trim())`, &videoTitles),
-
-		// Extrai os links dos vídeos
-		chromedp.Evaluate(`Array.from(document.querySelectorAll("#video-title-link")).map(e => "https://www.youtube.com" + e.getAttribute("href"))`, &videoLinks),
-	)
-	if err != nil {
-		log.Fatal("Failed to scrape YouTube:", err)
-	}
-
-	// Exibe os títulos e links
-
-	return videoTitles[0], videoLinks[0]
-}
 
 func main() {
 	err := godotenv.Load()
@@ -69,12 +29,30 @@ func main() {
 	}
 
 	lf := video.NewVideoFetcher(ytToken)
+	blxckbro := false
 
 	sess.AddHandler(func(s *discordgo.Session, m *discordgo.MessageCreate) {
 		if m.Author.ID == s.State.User.ID {
 			return
 		}
+		if strings.HasPrefix(m.Content, "addblxck!") && blxckbro {
+			// Remove o prefixo "addblxck!" para capturar a string seguinte
+			args := strings.TrimSpace(strings.TrimPrefix(m.Content, "addblxck!"))
+
+			if args == "" {
+				s.ChannelMessageSend(m.ChannelID, "kd o id bicho")
+				return
+			}
+			_, err := video.FetchLatestVideo(args, ytToken)
+			if err != nil {
+				s.ChannelMessageSend(m.ChannelID, "ESSE ID N EXISTE DOIDAO")
+				return
+			}
+			lf.Ids = append(lf.Ids, args)
+            s.ChannelMessageSend(m.ChannelID, "Added bro")
+		}
 		if m.Content == "blxck!" {
+			blxckbro = true
 			s.ChannelMessageSend(m.ChannelID, "blxck estará conosco aqui")
 			blxckwarningchannel = m.ChannelID
 
@@ -118,7 +96,6 @@ func main() {
 		if m.Content == "baller!" {
 			s.ChannelMessageSend(m.ChannelID, "https://tenor.com/view/roblox-baller-baller-roblox-roblox-meme-roblox-memes-gif-27316151")
 		}
-		
 
 		if strings.Index(fmt.Sprint(m.Content), "choose!") != -1 {
 			if len(m.Mentions) == 1 {
